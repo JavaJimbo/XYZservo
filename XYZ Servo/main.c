@@ -4,6 +4,7 @@
  * 
  * 7-4-18:      Adapted from PIC32MX795 Test. I-JOG command using SPEED CONTROL works swell.
  *              Also SET_POSITION_CONTROL works nicely.
+ * 7-5-18:      Added multiple servo addressing and memory write routines.
  ************************************************************************************************************/
 #ifndef MAIN_C
 #define MAIN_C
@@ -14,7 +15,7 @@
 #define true TRUE
 #define false FALSE
 
-#define SERVO_ID 0x01
+// #define SERVO_ID 254
 
 #define uint8_t unsigned char
 #define uint16_t unsigned short
@@ -103,12 +104,13 @@ void ConfigAd(void);
 void UserInit(void);
 static void InitializeSystem(void) ;
 unsigned char controlCommand = 0;
-uint8_t id = SERVO_ID;
 
-void sendRequest(uint8_t cmd,  const uint8_t * data1, uint8_t data1Size);
-void sendIJog(uint16_t goal, uint8_t type, uint8_t playtime);
-void setSpeed(int16_t speed);
-void setPosition(uint16_t position, uint8_t playtime);
+void sendRequest(uint8_t servoID, uint8_t cmd,  const uint8_t * data1, uint8_t data1Size);
+void setSpeed(uint8_t servoID, int16_t speed);
+void setPosition(uint8_t servoID, uint16_t position, uint8_t playtime);
+void sendIJog(uint8_t servoID, uint16_t goal, uint8_t type, uint8_t playtime);
+void memoryByteWrite(uint8_t servoID, uint8_t cmd, uint8_t memoryAddress, const uint8_t dataByte);
+
 
 int main(void) {
     bool runFlag = false;
@@ -118,12 +120,24 @@ int main(void) {
     short speed = 0;
     unsigned char playtime = 32;
     uint8_t dummy = 0x00;  
-    bool counterClockwise = true;
+    bool counterClockwise = true;    
+    uint8_t servoID = 254;
     
     previousPosition = positionActual = 0;
     InitializeSystem();
-
-    printf("\r Testing XYZ SET POSITION");
+    
+    printf("\rTesting two servo addressing...");
+    
+    
+    /*
+    printf("\rSetting servo ID...");
+    DelayMs(200);
+    memoryByteWrite(254, CMD_RAM_WRITE, 0, servoID_1);
+    DelayMs(200);
+    memoryByteWrite(254, CMD_EEPROM_WRITE, 6, servoID_1);
+    DelayMs(200);
+    printf("\rID #1 = %d", servoID_1);
+    */
     
     while(1)
     {
@@ -131,6 +145,9 @@ int main(void) {
         if (HOSTRxBufferFull)
         {      
             HOSTRxBufferFull = false;
+            
+            // CMD_RAM_WRITE
+            
             /*
             rotationCounter = 0;
             if (runFlag)
@@ -148,8 +165,13 @@ int main(void) {
                 setSpeed(speed);
                 sendRequest(CMD_STAT,  &dummy, 0);
             }
-            */
-            
+            */      
+                
+            uint8_t dummy = 0x00;            
+            sendRequest(servoID, CMD_STAT,  &dummy, 0);    
+            DelayMs(200);
+            setPosition (servoID, position, playtime);             
+            printf("\rID: %d, Position: %d, playtime: %d", servoID, position, playtime);
             
             if (counterClockwise) position = position + 100;
             else position = position - 100;
@@ -162,13 +184,10 @@ int main(void) {
             {
                 counterClockwise = true;
                 position = position + 200;
-            }
+            }                        
             
-            uint8_t dummy = 0x00;            
-            sendRequest(CMD_STAT,  &dummy, 0);    
-            DelayMs(200);
-            setPosition(position, playtime);             
-            printf("\rPosition: %d, playtime: %d", position, playtime);
+            if (servoID == 1) servoID = 3;
+            else servoID = 1;
             
         }     
         
@@ -466,7 +485,7 @@ void __ISR(XBEE_VECTOR, ipl2) IntXbeeHandler(void)
 }
 
 
-void sendRequest(uint8_t cmd,  const uint8_t * data1, uint8_t data1Size)
+void sendRequest(uint8_t servoID, uint8_t cmd,  const uint8_t * data1, uint8_t data1Size)
 {
     int i;
     unsigned char ch;
@@ -476,13 +495,13 @@ void sendRequest(uint8_t cmd,  const uint8_t * data1, uint8_t data1Size)
 
   uint8_t size = data1Size + HEADER_SIZE;
 
-  uint8_t checksum = size ^ id ^ cmd;
+  uint8_t checksum = size ^ servoID ^ cmd;
   for (i = 0; i < data1Size; i++) { checksum ^= data1[i]; }
   
   header[0] = 0xFF;
   header[1] = 0xFF;
   header[2] = size;
-  header[3] = id;
+  header[3] = servoID;
   header[4] = cmd;
   header[5] = checksum & 0xFE;
   header[6] = ~checksum & 0xFE;
@@ -502,29 +521,38 @@ void sendRequest(uint8_t cmd,  const uint8_t * data1, uint8_t data1Size)
     }
 }
 
-void setSpeed(int16_t speed)
+void setSpeed(uint8_t servoID, int16_t speed)
 {
     uint8_t playtime = 0x00;
-    sendIJog(speed, SET_SPEED_CONTROL, playtime);
+    sendIJog(servoID, speed, SET_SPEED_CONTROL, playtime);
 }
 
-void setPosition(uint16_t position, uint8_t playtime)
+void setPosition(uint8_t servoID, uint16_t position, uint8_t playtime)
 {  
-  sendIJog(position, SET_POSITION_CONTROL, playtime);
+  sendIJog(servoID, position, SET_POSITION_CONTROL, playtime);
 }
 
-void sendIJog(uint16_t goal, uint8_t type, uint8_t playtime)
+void sendIJog(uint8_t servoID, uint16_t goal, uint8_t type, uint8_t playtime)
 {
   #define DATA_SIZE 5  
   uint8_t data[DATA_SIZE];
   data[0] = goal & 0xFF;
   data[1] = goal >> 8 & 0xFF;
   data[2] = type;
-  data[3] = id;
+  data[3] = servoID;
   data[4] = playtime;
-  sendRequest(CMD_I_JOG, data, DATA_SIZE);
+  sendRequest(servoID, CMD_I_JOG, data, DATA_SIZE);
 }
 
+void memoryByteWrite(uint8_t servoID, uint8_t cmd, uint8_t memoryAddress, const uint8_t dataByte)
+{
+#define TOTAL_DATASIZE 3
+    uint8_t arrData[TOTAL_DATASIZE];
+    arrData[0] = memoryAddress;
+    arrData[1] = 1; // Number of data bytes = 1
+    arrData[2] = dataByte;
+    sendRequest(servoID, cmd, arrData, TOTAL_DATASIZE); 
+}
 
 /** EOF main.c *************************************************/
 #endif

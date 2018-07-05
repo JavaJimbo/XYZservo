@@ -29,6 +29,13 @@
         </file>
     </editor-bookmarks>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group/>
+        <group>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/main.c</file>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/Delay.h</file>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/HardwareProfile%20-%20PIC32MX795F512L%20PIM.h</file>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/XYZrobotServo.cpp</file>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/XYZrobotServo.h</file>
+            <file>file:/C:/Users/Jim/Documents/Work/XYZ%20Servo/HardwareProfile.h</file>
+        </group>
     </open-files>
 </project-private>
