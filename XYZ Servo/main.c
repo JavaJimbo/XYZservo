@@ -1,7 +1,6 @@
 /***********************************************************************************************************
  * PROJECT:     XYZ Servo
- * FileName:    main.c
- * 
+ * FileName:    main.c  
  * 
  * 7-4-18:      Adapted from PIC32MX795 Test. I-JOG command using SPEED CONTROL works swell.
  *              Also SET_POSITION_CONTROL works nicely.
@@ -10,6 +9,7 @@
 #define MAIN_C
 
 #define MAXPOTS 1
+#define bool BOOL
 
 #define true TRUE
 #define false FALSE
@@ -111,42 +111,84 @@ void setSpeed(int16_t speed);
 void setPosition(uint16_t position, uint8_t playtime);
 
 int main(void) {
-    short i = 0;    
-    unsigned char clockwise = true;
-    short position = 0x0000;    
-    uint8_t playtime = 0x20;
+    bool runFlag = false;
+    short runCounter = 0;
+    short previousPosition, positionActual, position = 0;
+    short rotationCounter = 0;
+    short speed = 0;
+    unsigned char playtime = 32;
+    uint8_t dummy = 0x00;  
+    bool counterClockwise = true;
+    
+    previousPosition = positionActual = 0;
     InitializeSystem();
 
     printf("\r Testing XYZ SET POSITION");
     
     while(1)
     {
-        DelayMs(1);               
+        DelayMs(10);               
         if (HOSTRxBufferFull)
-        {
+        {      
             HOSTRxBufferFull = false;
-            if (clockwise) position = position + 100;
-            else position = position - 100;            
+            /*
+            rotationCounter = 0;
+            if (runFlag)
+            {
+                runFlag = false;
+                printf("\rHALT");
+                setSpeed(0);
+            }             
+            else            
+            {
+                runFlag = true;
+                printf("\rRUN");   
+                runCounter = 10;
+                speed = 800;                
+                setSpeed(speed);
+                sendRequest(CMD_STAT,  &dummy, 0);
+            }
+            */
+            
+            
+            if (counterClockwise) position = position + 100;
+            else position = position - 100;
             if (position > 1023)
             {
-                clockwise = false;
+                counterClockwise = false;
                 position = position - 200;
             }
             else if (position < 0) 
             {
-                clockwise = true;
+                counterClockwise = true;
                 position = position + 200;
             }
-            setPosition(position, playtime);                                     
+            
+            uint8_t dummy = 0x00;            
+            sendRequest(CMD_STAT,  &dummy, 0);    
+            DelayMs(200);
+            setPosition(position, playtime);             
             printf("\rPosition: %d, playtime: %d", position, playtime);
-        }
+            
+        }     
         
+        /*
+        if (runFlag)
+        {
+            if (runCounter) runCounter--;
+            if (!runCounter)
+            {
+                runCounter = 5;                          
+                sendRequest(CMD_STAT,  &dummy, 0);                    
+            }            
+        } 
+        */       
         if (XBEERxLength)
         {
-            DelayMs(200);
-            printf("\rRX: ");
-            for (i = 0; i < XBEERxLength; i++)            
-                printf("%02X, ", XBEERxBuffer[i]);
+            positionActual = XBEERxBuffer[12] | (XBEERxBuffer[13] << 8);
+            if ((positionActual < 300 && previousPosition > 700)||(previousPosition < 300 && positionActual > 700)) printf("\r#%d", rotationCounter++);
+            //    printf("\r#%d, Pos: %d, Pre: %d", rotationCounter++, positionActual, previousPosition);
+            previousPosition = positionActual;
             XBEERxLength = 0;
         }        
     }    
